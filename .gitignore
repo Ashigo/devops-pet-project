@@ -49,3 +49,6 @@ terraform.rc
 # MacOS `.DS_Store` files
 .DS_Store
 
+
+# venv folder for python libraries
+.venv
