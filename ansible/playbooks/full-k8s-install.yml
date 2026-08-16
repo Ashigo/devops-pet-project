@@ -1,0 +1,18 @@
+# Full cluster bootstrap: common OS prep + containerd + kubeadm packages on
+# every node, then kubeadm init on the control plane, then kubeadm join on
+# the workers. Run this top-level playbook, or the three files individually
+# when iterating on one stage.
+
+- name: Prepare all nodes (OS prep, containerd, kubernetes packages)
+  hosts: k8s_cluster
+  become: true
+  roles:
+    - common
+    - containerd
+    - kubernetes
+
+- name: Bootstrap the Kubernetes control plane
+  import_playbook: control-plane.yml
+
+- name: Join worker nodes to the cluster
+  import_playbook: workers.yml

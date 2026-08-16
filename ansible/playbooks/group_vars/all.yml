@@ -1,0 +1,13 @@
+# Kubernetes package version (pkgs.k8s.io repo format, e.g. "1.31")
+kubernetes_version: "1.36"
+
+# Full package version pin (apt), leave empty to install latest in the minor line
+kubernetes_package_version: ""
+
+pod_network_cidr: "10.244.0.0/16"
+
+cluster_network_interface: "{{ ansible_default_ipv4.interface }}"
+
+flannel_manifest_url: "https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml"
+
+containerd_version: ""  # empty = latest from apt

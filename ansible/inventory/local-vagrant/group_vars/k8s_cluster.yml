@@ -1,0 +1,10 @@
+# This var is used to modify network configs
+# for /etc/hosts and Flanel manifest
+is_vagrant_lab: true
+
+# The private-network interface Vagrant creates for the cluster (eth1),
+# as opposed to eth0 which is the NAT adapter used for host internet access.
+# kubeadm's --apiserver-advertise-address and Flannel's --iface both need
+# to point here explicitly, or Flannel will silently pick eth0 and
+# cross-node pod traffic will fail (this bit Igor during the manual bootstrap).
+cluster_network_interface: "eth1"
