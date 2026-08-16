@@ -1,0 +1,39 @@
+- name: Add Kubernetes apt repository
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    types: [deb]
+    uris: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/"
+    suites: ["/"]
+    signed_by: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key"
+    state: present
+
+- name: Install kubelet, kubeadm, kubectl
+  ansible.builtin.apt:
+    name:
+      - "kubelet{{ '=' + kubernetes_package_version if kubernetes_package_version | length > 0 else '' }}"
+      - "kubeadm{{ '=' + kubernetes_package_version if kubernetes_package_version | length > 0 else '' }}"
+      - "kubectl{{ '=' + kubernetes_package_version if kubernetes_package_version | length > 0 else '' }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages at current version (avoid unattended upgrades)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Enable kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+
+- name: Set node-ip in kubelet config so it advertises the cluster network interface
+  ansible.builtin.lineinfile:
+    path: /etc/default/kubelet
+    line: "KUBELET_EXTRA_ARGS=--node-ip={{ ansible_facts[cluster_network_interface]['ipv4']['address'] }}"
+    create: true
+    mode: "0644"
+  notify: Restart kubelet

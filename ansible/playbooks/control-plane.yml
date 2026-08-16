@@ -1,0 +1,86 @@
+- name: Initialize the Kubernetes control plane
+  hosts: control_plane
+  become: true
+  vars:
+    kubeadm_init_marker: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Check whether the cluster is already initialized
+      ansible.builtin.stat:
+        path: "{{ kubeadm_init_marker }}"
+      register: kubeadm_init_status
+
+    - name: Get the control plane's cluster-network IP
+      ansible.builtin.set_fact:
+        control_plane_ip: "{{ ansible_facts[cluster_network_interface]['ipv4']['address'] }}"
+
+    - name: Run kubeadm init
+      ansible.builtin.command: >
+        kubeadm init
+        --apiserver-advertise-address={{ control_plane_ip }}
+        --pod-network-cidr={{ pod_network_cidr }}
+        --node-name={{ inventory_hostname }}
+      when: not kubeadm_init_status.stat.exists
+      changed_when: true
+
+    - name: Create .kube directory for the ansible_user
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Copy admin.conf to the ansible_user's kubeconfig
+      ansible.builtin.copy:
+        src: "{{ kubeadm_init_marker }}"
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        remote_src: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+
+    - name: Download Flannel manifest
+      ansible.builtin.get_url:
+        url: "{{ flannel_manifest_url }}"
+        dest: /tmp/kube-flannel.yml
+        mode: "0644"
+        force: true
+
+    # Flannel defaults to picking the first interface it finds, which on
+    # these VMs is eth0 (the NAT adapter), not eth1 (the private cluster
+    # network) - that breaks cross-node pod-to-pod traffic. Pin it
+    # explicitly, same fix as the manual bootstrap.
+    - name: Patch Flannel daemonset args to use the cluster network interface
+      ansible.builtin.replace:
+        path: /tmp/kube-flannel.yml
+        regexp: '(\s+- --kube-subnet-mgr)\n'
+        replace: '\1\n        - --iface={{ cluster_network_interface }}\n'
+      when: is_vagrant_lab | default(false)
+
+    - name: Apply Flannel manifest
+      ansible.builtin.command: kubectl --kubeconfig={{ kubeadm_init_marker }} apply -f /tmp/kube-flannel.yml
+      register: flannel_apply
+      changed_when: "'unchanged' not in flannel_apply.stdout"
+
+    - name: Generate the kubeadm join command
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: kubeadm_join_command
+      changed_when: false
+
+    - name: Save the join command to the control plane host (for reference)
+      ansible.builtin.copy:
+        content: "{{ kubeadm_join_command.stdout }}\n"
+        dest: /tmp/kubeadm_join_command.sh
+        mode: "0600"
+
+    - name: Fetch the join command to the Ansible control node
+      ansible.builtin.fetch:
+        src: /tmp/kubeadm_join_command.sh
+        dest: /tmp/artifacts/kubeadm_join_command.sh
+        flat: true
+
+    - name: Fetch kubeconfig to the Ansible control node (for local kubectl access)
+      ansible.builtin.fetch:
+        src: "{{ kubeadm_init_marker }}"
+        dest: /tmp/artifacts/kubeconfig
+        flat: true

@@ -21,7 +21,6 @@ It is better to specify current version of python when running `uv`
 uv venv --python 3.14
 ```
 
-
 ### Install ansible with uv
 
 ```bash
@@ -35,5 +34,3 @@ source .venv/bin/activate
 ansible-playbook -i ./inventory/local-vagrant/hosts.yml ./playbooks/full-k8s-install.yml
 deactivate
 ```
-```
-

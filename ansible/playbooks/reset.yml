@@ -1,0 +1,30 @@
+# Resets kubeadm state on all nodes so site.yml can be re-run cleanly,
+# without destroying/recreating the Vagrant VMs.
+
+- name: Reset kubeadm on all nodes
+  hosts: k8s_cluster
+  become: true
+  tasks:
+    - name: Run kubeadm reset
+      ansible.builtin.command: kubeadm reset -f
+      changed_when: true
+
+    - name: Remove leftover Kubernetes config and CNI state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes
+        - /etc/cni/net.d
+        - "/home/{{ ansible_user }}/.kube"
+        - /var/lib/etcd
+
+    - name: Flush iptables rules
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - iptables -F
+        - iptables -t nat -F
+        - iptables -t mangle -F
+        - iptables -X
+      changed_when: true
+      ignore_errors: false

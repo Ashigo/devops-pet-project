@@ -52,3 +52,6 @@ terraform.rc
 
 # venv folder for python libraries
 .venv
+
+# Do not include ansible collections folder
+ansible/collections

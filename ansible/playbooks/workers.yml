@@ -1,0 +1,33 @@
+- name: Join worker nodes to the cluster
+  hosts: workers
+  become: true
+  tasks:
+    - name: Check whether this node already joined the cluster
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf_status
+
+    - name: Copy the kubeadm join command from the Ansible control node
+      ansible.builtin.copy:
+        src: /tmp/artifacts/kubeadm_join_command.sh
+        dest: /tmp/kubeadm_join_command.sh
+        mode: "0700"
+      when: not kubelet_conf_status.stat.exists
+
+    - name: Run kubeadm join
+      ansible.builtin.command: bash /tmp/kubeadm_join_command.sh
+      when: not kubelet_conf_status.stat.exists
+      changed_when: true
+
+- name: Verify the cluster from the control plane
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Wait for all nodes to register
+      ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes
+      register: nodes_status
+      changed_when: false
+
+    - name: Show node ststus
+      ansible.builtin.debug:
+        var: nodes_status.stdout_lines
