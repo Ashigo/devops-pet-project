@@ -16,23 +16,16 @@
     state: present
     update_cache: true
 
-- name: Check if containerd config already exists
-  ansible.builtin.stat:
-    path: /etc/containerd/config.toml
-  register: containerd_config_stat
-
 - name: Generate default containerd config
   ansible.builtin.command: containerd config default
   register: containerd_default_config
   changed_when: false
-  when: not containerd_config_stat.stat.exists
 
 - name: Write containerd config
   ansible.builtin.copy:
     dest: /etc/containerd/config.toml
     content: "{{ containerd_default_config.stdout }}"
     mode: "0644"
-  when: not containerd_config_stat.stat.exists
   notify: Restart containerd
 
 - name: Enable SystemdCgroup in containerd config
